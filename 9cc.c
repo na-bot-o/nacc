@@ -8,6 +8,7 @@
 enum {
   TK_NUM = 256, //intefer token
   TK_EOF,       // end of input token
+  ND_NUM = 256, //int node type
 };
 
 //token type
@@ -15,9 +16,108 @@ enum {
 typedef struct {
   int ty; //token type
   int val; //value if ty is TK_NUM
-  char *input; // token string (error message)
+//  char *input; // token string (error message)
 } Token;
 
+typedef struct Node {
+  int ty;   //operator or ND_NUM
+  struct Node *lhs; //left side
+  struct Node *rhs; //right side
+  int val;  //use if ty is ND_NUM
+} Node;
+
+
+Node *new_node(int ty, Node *lhs, Node *rhs) {
+  Node *node = malloc(sizeof(Node));
+  node -> ty = ty;
+  node -> lhs = lhs;
+  node -> rhs = rhs;
+  return node;
+}
+
+
+Node *new_node_num(int val){
+  Node *node = malloc(sizeof(Node));
+  node->ty = ND_NUM;
+  node->val = val;
+  return node;
+}
+
+//token index
+int pos = 0;
+
+int consume(int ty) {
+  if(tokens[pos].ty != ty)
+    return 0;
+  pos++;
+  return 1;
+}
+
+Node *add(){
+  Node *node = mul();
+ 
+  for(;;) {
+    if(consume('+'))
+      node = new_node('+', node, mul());
+    else if (consume('-'))
+      node = new_node('-',node,mul());
+    else
+      return node;
+  }
+}
+
+Node *mul() {
+  Node *node = term();
+
+  for(;;) {
+    if(consume('*'))
+      node = new_node('*',node,term());
+    else if (consume('/'))
+      node = new_node('/',node, term());
+    else
+      return node;
+  }
+}
+
+Node *term(){
+  if (consume('(')) {
+    Node *node = add();
+    if (!consume(')'))
+      error("not close brackets: %s",tokens[pos].input);
+    return node;
+  }
+
+  if(tokens[pos].ty == TK_NUM)
+    return new_node_num(tokens[pos++].val);
+  error("this token isn't int or open brackets: %s",tokens[pos].input);
+}
+
+void gen(Node *node){
+  if(node->ty == ND_NUM) {
+    printf("  push %d\n",node->val);
+    return;
+  }
+
+  gen(node->lhs);
+  gen(node->rhs);
+
+  printf("  pop rdi\n");
+  printf("  pop rax\n");
+
+  switch(node->ty){
+  case '+':
+    printf("  add rax, rdi\n");
+    break;
+  case '-':
+    printf("  sub rax, rdi\n");
+    break;
+  case '*':
+    printf("  mul rdi\n");
+  case '/':
+    printf("  mov rdx, 0\n");
+    printf("  div rdi\n");
+  }
+}
 // save tokenized string to this array
 // limit is 100
 Token tokens[100];
