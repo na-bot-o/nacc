@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdarg.h>
 
+
+
 //token type value
 enum {
   TK_NUM = 256, //intefer token
@@ -11,12 +13,14 @@ enum {
   ND_NUM = 256, //int node type
 };
 
+
+
 //token type
 
 typedef struct {
   int ty; //token type
   int val; //value if ty is TK_NUM
-//  char *input; // token string (error message)
+  char *input; // token string (error message)
 } Token;
 
 typedef struct Node {
@@ -28,9 +32,20 @@ typedef struct Node {
 
 typedef struct {
   void **data;
-  int capatity;
+  int capacity;
   int len;
 } Vector;
+
+
+// save tokenized string to this array
+// limit is 100
+Token tokens[100];
+
+//prototype 
+Node *term();
+Node *add();
+Node *mul();
+
 
 
 Node *new_node(int ty, Node *lhs, Node *rhs) {
@@ -49,8 +64,8 @@ Node *new_node_num(int val){
   return node;
 }
 
-Ventor *new_ventor(){
-  Vector *vev = malloc(sizeof(Vector));
+Vector *new_vector(){
+  Vector *vec = malloc(sizeof(Vector));
   vec->data = malloc(sizeof(void *) * 16);
   vec->capacity = 16;
   vec->len = 0;
@@ -75,17 +90,17 @@ int consume(int ty) {
   return 1;
 }
 
-Node *add(){
-  Node *node = mul();
- 
-  for(;;) {
-    if(consume('+'))
-      node = new_node('+', node, mul());
-    else if (consume('-'))
-      node = new_node('-',node,mul());
-    else
-      return node;
+Node *term(){
+  if (consume('(')) {
+    Node *node = add();
+    if (!consume(')'))
+      error("not close brackets: %s",tokens[pos].input);
+    return node;
   }
+
+  if(tokens[pos].ty == TK_NUM)
+    return new_node_num(tokens[pos++].val);
+  error("this token isn't int or open brackets: %s",tokens[pos].input);
 }
 
 Node *mul() {
@@ -101,18 +116,20 @@ Node *mul() {
   }
 }
 
-Node *term(){
-  if (consume('(')) {
-    Node *node = add();
-    if (!consume(')'))
-      error("not close brackets: %s",tokens[pos].input);
-    return node;
+Node *add(){
+  Node *node = mul();
+ 
+  for(;;) {
+    if(consume('+'))
+      node = new_node('+', node, mul());
+    else if (consume('-'))
+      node = new_node('-',node,mul());
+    else
+      return node;
   }
-
-  if(tokens[pos].ty == TK_NUM)
-    return new_node_num(tokens[pos++].val);
-  error("this token isn't int or open brackets: %s",tokens[pos].input);
 }
+
+
 
 void gen(Node *node){
   if(node->ty == ND_NUM) {
@@ -140,9 +157,6 @@ void gen(Node *node){
     printf("  div rdi\n");
   }
 }
-// save tokenized string to this array
-// limit is 100
-Token tokens[100];
 
 //error func
 //take arg the same as printf
@@ -188,10 +202,42 @@ void tokenize(char *p){
   tokens[i].input = p;
 }
 
+
+//test code
+int expect(int line, int expected, int actual){
+  if(expected == actual)
+    return;
+  fprintf(stderr, "%d: %d expected, but got %d\n",line, expected,actual);
+  exit(1);
+}
+
+void runtest(){
+  Vector *vec = new_vector();
+  expect(__LINE__,0, vec->len);
+
+  for(int i = 0; i < 100; i++)
+    vec_push(vec, (void *)i);
+
+    expect(__LINE__, 100, vec->len);
+    expect(__LINE__, 0, (int)vec->data[0]);
+    expect(__LINE__, 50, (int)vec->data[50]);
+    expect(__LINE__, 90, (int)vec->data[90]);
+
+    printf("OK\n");
+}
+
+
 int main(int argc, char **argv) {
   if (argc != 2){
     fprintf(stderr,"引数の個数が正しくありません\n");
     return 1;
+  }
+  
+  if(strcmp(argv[1],"-test")==0){
+    printf("run test");
+    runtest();
+    return 1;
+    printf("end test");
   }
 
    tokenize(argv[1]);
@@ -240,3 +286,4 @@ int main(int argc, char **argv) {
   return 0;
 
 }
+
